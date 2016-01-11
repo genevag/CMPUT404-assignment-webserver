@@ -41,10 +41,10 @@ class MyWebServer(SocketServer.BaseRequestHandler):
         print 'requestType : ' + requestType
         print 'urlEndpoint : ' + urlEndpoint, '\n'
 
-        if urlEndpoint != '/':
-            path = os.path.normpath(os.getcwd() +  '/www' + urlEndpoint)
-            print 'Path : ' + path, '\n'
+        path = os.path.normpath(os.getcwd() +  '/www' + urlEndpoint)
 
+        if urlEndpoint != '/' and urlEndpoint != '/deep' and urlEndpoint != '/deep/':
+            print 'Path : ' + path, '\n'
             # req = open('www' + urlEndpoint, 'r')
 
             # forbidden - restrict access to www directory only and not higher directories
@@ -64,8 +64,14 @@ class MyWebServer(SocketServer.BaseRequestHandler):
             self.request.send(page.read())
 
         else:
-            self.request.send('HTTP/1.1 200 OK\r\n')
+            path = os.path.normpath(path + '/index.html')
+            print 'Path : ' + path, '\n'
             
+            page = urllib2.urlopen('file://' + path)
+            self.request.send('HTTP/1.1 200 OK\r\n')
+            self.request.send(str(page.headers))
+            self.request.send(page.read())
+
         print '\n --------------------------------', '\n'
 
 
