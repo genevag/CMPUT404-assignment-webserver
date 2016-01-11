@@ -1,5 +1,8 @@
 #  coding: utf-8 
 import SocketServer
+import mimetypes
+import urllib2
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -30,9 +33,42 @@ import SocketServer
 class MyWebServer(SocketServer.BaseRequestHandler):
     
     def handle(self):
+        print '\n --------------------------------', '\n'
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall("OK")
+
+        requestType, urlEndpoint, other = self.data.split(' ', 2)
+        print 'requestType : ' + requestType
+        print 'urlEndpoint : ' + urlEndpoint, '\n'
+
+        if urlEndpoint != '/':
+            path = os.path.normpath(os.getcwd() +  '/www' + urlEndpoint)
+            print 'Path : ' + path, '\n'
+
+            # req = open('www' + urlEndpoint, 'r')
+
+            # forbidden - restrict access to www directory only and not higher directories
+            if '..' in urlEndpoint:
+                self.request.send("HTTP/1.1 403\r\n")
+                return
+
+            if os.path.exists(path):
+                page = urllib2.urlopen('file://' + path)
+            else:
+                print 'file path not exists'
+                self.request.send("HTTP/1.1 404\r\n")
+                return
+
+            self.request.send('HTTP/1.1 200 OK\r\n')
+            self.request.send(str(page.headers))
+            self.request.send(page.read())
+
+        else:
+            self.request.send('HTTP/1.1 200 OK\r\n')
+            
+        print '\n --------------------------------', '\n'
+
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
@@ -44,3 +80,5 @@ if __name__ == "__main__":
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
     server.serve_forever()
+
+    print 'Serving on : ' + str(HOST) + ":" + str(PORT)
