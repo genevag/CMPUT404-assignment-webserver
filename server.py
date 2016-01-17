@@ -62,7 +62,10 @@ class MyWebServer(SocketServer.BaseRequestHandler):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
 
-        info, others = self.data.split('\n', 1)
+        if self.data.find('\n') == -1:
+            info = self.data
+        else:
+            info, others = self.data.split('\n', 1)
         requestType, urlEndpoint, self.httpVersion = info.split(' ', 2)
 
         # normalize file path : changes "/www/deep/../base.css" to "/www/base.css"
