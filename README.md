@@ -16,9 +16,11 @@ server.py contains contributions from:
 
 * Abram Hindle
 * Eddie Antonio Santos
+* Geneva Giang
+
+* User:phihag from http://stackoverflow.com/questions/10175134/last-modified-of-file-downloaded-does-not-match-its-http-header on 01-16-2016 (format to convert date to)
 
 But the server.py example is derived from the python documentation
 examples thus some of the code is Copyright © 2001-2013 Python
 Software Foundation; All Rights Reserved under the PSF license (GPL
 compatible) http://docs.python.org/2/library/socketserver.html
-
