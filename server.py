@@ -1,10 +1,11 @@
 #  coding: utf-8 
 import SocketServer
 import mimetypes
-import urllib2
 import os
+from datetime import datetime
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
+#           2016 Geneva Giang
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,79 +30,74 @@ import os
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
-
-'''
------ PROBLEM -----
-127.0.0.1:8080/deep   doesn't render the css b/c it gets /deep.css instead of /deep/deep.css
-'''
-
 class MyWebServer(SocketServer.BaseRequestHandler):
+
+    def formulate200Response(self, path):
+        file = open(path, "r")
+        body = file.read()
+        file.close()
+
+        # Get headers
+        header = self.httpVersion + " 200 OK\r\n"
+
+        mimetype, encoding = mimetypes.guess_type(path)
+        length = os.path.getsize(path)
+        lastModifiedTime = os.path.getmtime(path)
+
+        # format taken from : phihag on http://stackoverflow.com/questions/10175134/last-modified-of-file-downloaded-does-not-match-its-http-header  01-16-2016
+        formatWanted = "%a, %d %b %Y %H:%M:%S GMT"
+
+        lastModifiedDate = datetime.fromtimestamp(lastModifiedTime).strftime(formatWanted)
+
+        contentType = "Content-type: " + mimetype + '\n'
+        contentLength = "Content-length: " + str(length) + '\n'
+        lastModified = "Last-modified: " + lastModifiedDate
+        header = header + contentType + contentLength + lastModified + "\r\n\r\n"
+
+        response = header + body
+        return response
+
     
     def handle(self):
-        print '\n --------------------------------', '\n'
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
 
-        requestType, urlEndpoint, other = self.data.split(' ', 2)
-        print 'requestType : ' + requestType
-        print 'urlEndpoint : ' + urlEndpoint, '\n'
+        info, others = self.data.split('\n', 1)
+        requestType, urlEndpoint, self.httpVersion = info.split(' ', 2)
 
         # normalize file path : changes "/www/deep/../base.css" to "/www/base.css"
-        print "Input Path : " + os.getcwd() + '/www' + urlEndpoint
         path = os.path.normpath(os.getcwd() +  '/www' + urlEndpoint)
-        print "Normalized Path : " + path + '\n'
 
 
-
-        # ------------------------------------------- #
-        # ----- Validate directory to restricted access only ----- #
+        # -- Validate directory to restricted access to allowed directory only -- #
         # forbidden - restrict access to www directory only and not higher directories
         if (path != os.getcwd() + '/www') and (os.getcwd() + '/www/' not in path):
-            self.request.send("HTTP/1.1 403\r\n")
-            return
-        # ------------------------------------------- #
+            self.request.send(self.httpVersion + " 404 Not Found\r\n")
 
-
-
-        # ------------------------------------------- #
-        # ------ Here, access is allowed ------ #
-
-
-        # --- Valid/Existing Path & Valid/Existing File --- #
+        # -- Valid/Existing Path & Valid/Existing File -- #
         # ----- Validate path & file & send 200 response ----- #
-        if os.path.exists(path) and os.path.isfile(path):
-            page = urllib2.urlopen('file://' + path)
-            self.request.send('HTTP/1.1 200 OK\r\n')
-            self.request.send(str(page.headers) + '\r\n\r\n')
-            self.request.send(page.read())
-        # ------------------------------------------- #
+        elif os.path.exists(path) and os.path.isfile(path):
+            response = self.formulate200Response(path)
+            self.request.send(response)
 
 
 
-        # --- In the allowed "/www" directory & path is a directory, not a file --- #
+        # --- In the allowed "/www" directory & path is a directory, but not a file --- #
+        # ----- Validate path & directory & send 301 redirect response ----- #
         # ----- path is '/' or '/deep' --> redirect to index.html file for that directory ----- #
         elif os.path.exists(path) and os.path.isdir(path):
-            newUrlEndpoint = os.path.normpath(urlEndpoint + '/index.html')
-            newPath = os.path.normpath(os.getcwd() +  '/www/' + newUrlEndpoint)
+            if urlEndpoint[-1] == '/':
+                newUrlEndpoint = os.path.normpath(urlEndpoint + 'index.html')
+            else:
+                newUrlEndpoint = os.path.normpath(urlEndpoint + '/index.html')
 
-            print "newUrlEndpoint : " + newUrlEndpoint
-            print "newPath : " + newPath
-
-            # self.request.send('HTTP/1.1 301 Moved Permanently\r\n')
-            # self.request.send('Location: ' + newUrlEndpoint)
-
-            page = urllib2.urlopen('file://' + newPath)
-            self.request.send('HTTP/1.1 200 OK\r\n')
-            self.request.send(str(page.headers) + '\r\n\r\n')
-            self.request.send(page.read())
-        # ------------------------------------------- #
+            self.request.send(self.httpVersion + ' 301 Moved Permanently\r\n')
+            self.request.send('Location: ' + newUrlEndpoint + '\r\n\r\n')
 
 
-
-        # ----- Bad path or non-existing file, send 404 response ---- #
+        # -- Non-existing path or non-existing file, send 404 response -- #
         else:
-            self.request.send("HTTP/1.1 404\r\n")
-        # ------------------------------------------- #
+            self.request.send(self.httpVersion + " 404 Not Found\r\n")
 
 
 
